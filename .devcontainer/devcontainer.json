@@ -1,8 +1,10 @@
 {
   "name": "Container Network Security Lab",
-  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
 
-
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
 
   "customizations": {
     "vscode": {
@@ -13,10 +15,11 @@
     }
   },
 
-  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y iputils-ping curl wget",
+  "postCreateCommand": "apt-get update && apt-get install -y iputils-ping curl wget",
+
   "postStartCommand": "docker info && bash /workspaces/docketNetworking/check.sh",
 
-  "remoteUser": "codespace",
+  "remoteUser": "vscode",
 
   "forwardPorts": [8080],
 
