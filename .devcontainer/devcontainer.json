@@ -1,0 +1,37 @@
+{
+  "name": "Container Network Security Lab",
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "moby": true
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "github.codespaces",
+        "ms-azuretools.vscode-docker",
+        "ms-vscode-remote.remote-ssh",
+        "ms-vscode.remote-explorer",
+        "ms-vscode.vscode-json"
+      ]
+    }
+  },
+
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y iputils-ping net-tools curl wget && docker pull ubuntu:focal && docker pull nginx:latest",
+  "postStartCommand": "docker info && bash /workspaces/docketNetworking/check.sh",
+
+  "remoteUser": "codespace",
+
+  "forwardPorts": [8080],
+
+  "portsAttributes": {
+    "8080": {
+      "label": "Nginx Web Server",
+      "onAutoForward": "openBrowser"
+    }
+  }
+}
