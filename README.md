@@ -59,6 +59,12 @@ docker images
 - `docker network create --driver bridge csf-net` creates a new custom bridge network named `csf-net` for your containers to use. This network isolates your containers from others and lets you control their communication.
 - `docker network ls` lists all Docker networks, so you can confirm your new network was created.
 
+```bash
+docker network create --driver bridge csf-net 
+docker network ls
+```
+
+
 **Why?**
 > A user-defined bridge network (csf-net) allows containers to communicate securely and predictably. Unlike the default bridge, it provides better network isolation and lets you control which containers can talk to each other. This is important for container security, as it limits exposure and enables network segmentation—key principles in secure container deployments.
 
