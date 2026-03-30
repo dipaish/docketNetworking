@@ -14,7 +14,7 @@ In this lab, you will:
 
 ## Step 0: Open in Codespaces
 
-1. Fork this (repository)[https://github.com/dipaish/docketNetworking] to your GitHub account.
+1. Fork this [repository](https://github.com/dipaish/docketNetworking) to your GitHub account.
 2. Navigate to your forked repository and select:
    **Code → Codespaces → Create codespace**
 3. Wait for the environment to start.
