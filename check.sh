@@ -1,38 +1,3 @@
-# -----------------------------
-# 0. Get GitHub username (if in Codespaces)
-# -----------------------------
-
-GITHUB_USER="unknown"
-if [ -n "${CODESPACE_NAME:-}" ]; then
-  GITHUB_USER="$(echo "$CODESPACE_NAME" | cut -d'-' -f1)"
-elif [ -n "${USER:-}" ]; then
-  GITHUB_USER="$USER"
-fi
-
-# -----------------------------
-# 1. Check Docker is working
-# -----------------------------
-# 1a. Check custom bridge network exists
-# -----------------------------
-
-if docker network ls | grep -q "csf-net"; then
-  check_pass "Custom bridge network 'csf-net' exists"
-else
-  check_fail "Custom bridge network 'csf-net' missing"
-fi
-
-# -----------------------------
-# 1b. Check containers are on csf-net
-# -----------------------------
-
-ON_NET1=$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{if eq $k "csf-net"}}yes{{end}}{{end}}' csf-ubuntu1 2>/dev/null)
-ON_NET2=$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{if eq $k "csf-net"}}yes{{end}}{{end}}' csf-ubuntu2 2>/dev/null)
-if [ "$ON_NET1" = "yes" ] && [ "$ON_NET2" = "yes" ]; then
-  check_pass "Both containers are attached to 'csf-net'"
-else
-  check_fail "Containers are not both on 'csf-net'"
-fi
-
 #!/bin/bash
 set -euo pipefail
 
@@ -44,135 +9,135 @@ for cmd in docker curl grep; do
   fi
 done
 
-
-echo "🔍 Running Lab Checks..."
-echo "----------------------------------"
-
-
+TOTAL_POINTS=6
 PASS_COUNT=0
 FAIL_COUNT=0
+LOGFILE=$(mktemp)
 
+# Cleanup temp file on exit
+trap 'rm -f "$LOGFILE"' EXIT
 
 check_pass() {
-  echo -e "\033[1;32m✅ PASS:\033[0m $1"
+  local msg="$1"
+  echo -e "\033[1;32m✅ PASS:\033[0m $msg"
+  echo "- ✅ **PASS:** $msg" >> "$LOGFILE"
   PASS_COUNT=$((PASS_COUNT+1))
 }
 
 check_fail() {
-  echo -e "\033[1;31m❌ FAIL:\033[0m $1"
+  local msg="$1"
+  echo -e "\033[1;31m❌ FAIL:\033[0m $msg"
+  echo "- ❌ **FAIL:** $msg" >> "$LOGFILE"
   FAIL_COUNT=$((FAIL_COUNT+1))
 }
 
 # -----------------------------
-# 1. Check Docker is working
+# 0. Get GitHub username (if in Codespaces)
+# -----------------------------
+
+if [ -n "${GITHUB_USER:-}" ]; then
+  : # Codespaces already sets GITHUB_USER natively
+elif [ -n "${CODESPACE_NAME:-}" ] && command -v gh > /dev/null 2>&1; then
+  GITHUB_USER="$(gh api user --jq .login 2>/dev/null || echo "unknown")"
+elif [ -n "${CODESPACE_NAME:-}" ]; then
+  GITHUB_USER="$(echo "$CODESPACE_NAME" | cut -d'-' -f1)"
+elif [ -n "${USER:-}" ]; then
+  GITHUB_USER="$USER"
+else
+  GITHUB_USER="unknown"
+fi
+
+echo "🔍 Running Lab Checks..."
+echo "----------------------------------"
+
+# -----------------------------
+# Task 1: Docker is running
 # -----------------------------
 
 if docker ps > /dev/null 2>&1; then
-  check_pass "Docker is running"
+  check_pass "Task 1: Docker is running"
 else
-  check_fail "Docker is NOT running"
+  check_fail "Task 1: Docker is NOT running"
 fi
 
 # -----------------------------
-# 2. Check ubuntu image pulled
+# Task 2: Custom bridge network 'csf-net' exists
 # -----------------------------
 
-if docker images | grep -q "ubuntu.*focal"; then
-  check_pass "Ubuntu image (focal) exists"
+if docker network ls --format '{{.Name}}' | grep -qx "csf-net"; then
+  check_pass "Task 2: Custom bridge network 'csf-net' exists"
 else
-  check_fail "Ubuntu image not found"
+  check_fail "Task 2: Custom bridge network 'csf-net' missing"
 fi
 
 # -----------------------------
-# 3. Check first container
+# Task 3: Both containers exist, are running, and attached to csf-net
 # -----------------------------
 
-if docker ps -a | grep -q "csf-ubuntu1"; then
-  check_pass "Container csf-ubuntu1 exists"
+RUNNING=$(docker ps --format '{{.Names}}' | grep -cE "^(csf-ubuntu1|csf-ubuntu2)$" || true)
+ON_NET1=$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{if eq $k "csf-net"}}yes{{end}}{{end}}' csf-ubuntu1 2>/dev/null || true)
+ON_NET2=$(docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{if eq $k "csf-net"}}yes{{end}}{{end}}' csf-ubuntu2 2>/dev/null || true)
+if [ "$RUNNING" -ge 2 ] && [ "$ON_NET1" = "yes" ] && [ "$ON_NET2" = "yes" ]; then
+  check_pass "Task 3: csf-ubuntu1 and csf-ubuntu2 are running and attached to 'csf-net'"
 else
-  check_fail "csf-ubuntu1 missing"
+  check_fail "Task 3: Containers are not both running and attached to 'csf-net'"
 fi
 
 # -----------------------------
-# 4. Check second container
+# Task 4: Container-to-container connectivity (ping)
 # -----------------------------
 
-if docker ps -a | grep -q "csf-ubuntu2"; then
-  check_pass "Container csf-ubuntu2 exists"
+IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' csf-ubuntu1 2>/dev/null || true)
+if [ -n "$IP" ] && docker exec csf-ubuntu2 ping -c 1 "$IP" > /dev/null 2>&1; then
+  check_pass "Task 4: Container-to-container ping works"
 else
-  check_fail "csf-ubuntu2 missing"
+  check_fail "Task 4: Ping between containers failed"
 fi
 
 # -----------------------------
-# 5. Check containers running
+# Task 5: Nginx container is running
 # -----------------------------
 
-RUNNING=$(docker ps | grep -E "csf-ubuntu1|csf-ubuntu2" | wc -l)
-if [ "$RUNNING" -ge 2 ]; then
-  check_pass "Both containers are running"
+if docker ps --format '{{.Names}}' | grep -qx "csf-nginx"; then
+  check_pass "Task 5: Nginx container is running"
 else
-  check_fail "Containers are not running properly"
+  check_fail "Task 5: Nginx container not running"
 fi
 
 # -----------------------------
-# 6. Check networking (ping)
-# -----------------------------
-
-IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' csf-ubuntu1 2>/dev/null)
-if [ -z "$IP" ]; then
-  check_fail "Could not retrieve IP of csf-ubuntu1"
-else
-  if docker exec csf-ubuntu2 ping -c 1 "$IP" > /dev/null 2>&1; then
-    check_pass "Container-to-container ping works"
-  else
-    check_fail "Ping between containers failed"
-  fi
-fi
-
-# -----------------------------
-# 7. Check nginx container
-# -----------------------------
-
-if docker ps | grep -q "csf-nginx"; then
-  check_pass "Nginx container is running"
-else
-  check_fail "Nginx container not running"
-fi
-
-# -----------------------------
-# 8. Check port 8080
+# Task 6: Nginx web server accessible on port 8080
 # -----------------------------
 
 if curl -s http://localhost:8080 | grep -q "Welcome to nginx"; then
-  check_pass "Nginx web server accessible on port 8080"
+  check_pass "Task 6: Nginx web server accessible on port 8080"
 else
-  check_fail "Cannot access nginx on port 8080"
+  check_fail "Task 6: Cannot access nginx on port 8080"
 fi
 
 # -----------------------------
-
-
 # Summary
+# -----------------------------
+
 echo "----------------------------------"
 echo -e "\033[1m🎯 RESULTS:\033[0m"
-echo -e "\033[1;32mPassed: $PASS_COUNT\033[0m"
-echo -e "\033[1;31mFailed: $FAIL_COUNT\033[0m"
+echo -e "\033[1;32mPassed: $PASS_COUNT / $TOTAL_POINTS\033[0m"
+echo -e "\033[1;31mFailed: $FAIL_COUNT / $TOTAL_POINTS\033[0m"
 
-if [ "$FAIL_COUNT" -eq 0 ]; then
+if [ "$PASS_COUNT" -eq "$TOTAL_POINTS" ]; then
   echo -e "\033[1;32m🏆 All checks passed! Lab complete.\033[0m"
 else
   echo -e "\033[1;33m⚠️ Some checks failed. Review your steps.\033[0m"
 fi
 
-# Write marksheet
+# Write marksheet from actual runtime results
 MARKSHEET=marksheet.md
 {
   echo "# Lab Marksheet"
+  echo ""
   echo "- **GitHub Username:** $GITHUB_USER"
-  echo "- **Passed:** $PASS_COUNT"
-  echo "- **Failed:** $FAIL_COUNT"
+  echo "- **Score:** $PASS_COUNT / $TOTAL_POINTS"
   echo ""
   echo "## Check Results"
-  grep -E "PASS:|FAIL:" "$0" | sed 's/^/    /'
+  cat "$LOGFILE"
 } > "$MARKSHEET"
 echo "Marksheet written to $MARKSHEET"
