@@ -15,9 +15,9 @@
     }
   },
 
-  "postCreateCommand": "apt-get update && apt-get install -y iputils-ping curl wget",
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y iputils-ping curl wget",
 
-  "postStartCommand": "docker info && bash /workspaces/docketNetworking/check.sh",
+  "postStartCommand": "for i in $(seq 1 30); do docker info >/dev/null 2>&1 && break; sleep 1; done; bash ${containerWorkspaceFolder}/check.sh",
 
   "remoteUser": "vscode",
 
